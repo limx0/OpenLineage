@@ -18,6 +18,13 @@ default_args = {
 
 data_context_dir = "/opt/data/great_expectations"
 
+from logging import getLogger
+import os
+getLogger(__name__).info(f"{os.listdir('/opt')}")
+getLogger(__name__).info(f"{os.listdir('/opt/data')}")
+getLogger(__name__).info(f"{os.listdir('/opt/data/great_expectations')}")
+getLogger(__name__).info(f"{os.listdir('/opt/data/great_expectations/data')}")
+
 dag = DAG(
     'great_expectations_validation',
     schedule_interval='@once',

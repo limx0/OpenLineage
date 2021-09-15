@@ -37,6 +37,8 @@ OPENLINEAGE_AIRFLOW_WHL_ALL=$(docker run openlineage-airflow-base:latest sh -c "
 
 # Add revision to requirements.txt
 cat > requirements.txt <<EOL
+apache-airflow[celery]==1.10.12
+great_expectations==0.13.33
 airflow-provider-great-expectations==0.0.8
 dbt-bigquery==0.20.1
 ${OPENLINEAGE_AIRFLOW_WHL}
@@ -52,4 +54,5 @@ retrying==1.3.3
 pytest==6.2.2
 EOL
 
-docker-compose up --build --force-recreate --exit-code-from integration
+docker-compose up --build --abort-on-container-exit airflow-init postgres
+docker-compose up --build --exit-code-from integration --scale airflow-init=0
