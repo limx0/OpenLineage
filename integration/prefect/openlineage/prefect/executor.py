@@ -7,13 +7,15 @@ from prefect.orion.schemas.core import TaskRun
 from prefect.orion.schemas.states import State
 from prefect.utilities.asyncio import A, R
 
+from openlineage.prefect.util import utc_now
+
 
 class OpenLineageExecutor(BaseExecutor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._adapter = OpenLineageAdapter()
         # Ensure we can connect early - don't want this to trigger tasks to fail inside the flow
-        self._adapter.ping()
+        # self._adapter.ping()
 
     async def submit(
         self,
@@ -27,6 +29,12 @@ class OpenLineageExecutor(BaseExecutor):
             run_fn=run_fn,
             run_kwargs=run_kwargs,
             asynchronous=asynchronous,
+        )
+        self._adapter.start_task(
+            run_id=str(task_run.id),
+            job_name=run_kwargs['task'].name,
+            job_description=run_kwargs['task'].description,
+            event_time=utc_now(),
         )
         return future
 

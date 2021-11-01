@@ -44,7 +44,9 @@ class OpenLineageAdapter:
         return NAMESPACE
 
     def ping(self):
-        resp = self.client.session.get(self.client.url.replace("5000", "5001"))
+        port = int(self.client.url.rsplit(":", maxsplit=1)[1])
+        api_url = self.client.url.replace(str(port), str(port + 1))
+        resp = self.client.session.get(api_url)
         return resp.status_code == 200
 
     # @staticmethod
@@ -90,7 +92,7 @@ class OpenLineageAdapter:
         job_name: str,
         job_description: str,
         event_time: str,
-        parent_run_id: Optional[str],
+        parent_run_id: Optional[str] = None,
         inputs: Optional[List[InputDataset]] = None,
         outputs: Optional[OutputDataset] = None,
         job_facets: Optional[List[BaseFacet]] = None,

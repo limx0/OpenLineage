@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 
 from openlineage.client import OpenLineageClient
@@ -27,7 +28,7 @@ class TestAdapter:
 
     @patch.object(OpenLineageClient, "emit")
     def test_task_started_to_run_event(self, mock_emit):
-        simple_flow(p=1)
+        result = simple_flow(p=1)
         run_event = mock_emit.call_args.args[0]
         expected = RunEvent(
             eventType=RunState.START,
