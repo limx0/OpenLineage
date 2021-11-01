@@ -3,12 +3,11 @@ from unittest.mock import patch
 
 import prefect
 from openlineage.client import OpenLineageClient
-from prefect import task, Flow
-from requests import Response
-
 from openlineage.prefect.adapter import OpenLineageAdapter
-from openlineage.prefect.flow_runner import OpenLineageFlowRunner
+from openlineage.prefect.executor import OpenLineageFlowRunner
 from openlineage.prefect.test_utils.tasks import test_flow
+from prefect import Flow, task
+from requests import Response
 
 
 class TestCachedFlowRunner:

@@ -18,7 +18,7 @@ A library that integrates [Prefect](https://www.prefect.io/) `Flows` with [OpenL
 ## Requirements
 
 - [Python >= 3.7](https://www.python.org/downloads)
-- [Prefect >= 0.15.0](https://docs.prefect.io/) (may work for earlier versions)
+- [Prefect >= 2.0a3](https://docs.prefect.io/)
 
 ## Installation
 

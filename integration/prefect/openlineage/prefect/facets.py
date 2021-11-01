@@ -1,10 +1,9 @@
 import attr
 import prefect
-from prefect import Task
-from prefect._version import get_versions
 from openlineage.client.facet import BaseFacet
-
 from openlineage.prefect.util import task_qualified_name
+from prefect._version import get_versions
+from prefect.tasks import Task
 
 
 @attr.s

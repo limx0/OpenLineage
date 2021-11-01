@@ -1,26 +1,23 @@
 import os
-from typing import Dict, Optional, Type, List
+from typing import Dict, List, Optional, Type  # noqa: TYP001
 
 import prefect
-from openlineage.client import OpenLineageClient
-from openlineage.client import set_producer
+from openlineage.client import OpenLineageClient, set_producer
 from openlineage.client.facet import (
     BaseFacet,
-    DataSourceDatasetFacet,
     DocumentationJobFacet,
-    SourceCodeLocationJobFacet,
     ParentRunFacet,
+    SourceCodeLocationJobFacet,
 )
-from openlineage.client.run import Job, RunState, InputDataset, OutputDataset
-from openlineage.client.run import Run
-from openlineage.client.run import RunEvent
-from prefect import Task, Parameter
-from prefect.engine.result import Result
-from prefect.engine.state import State, Pending, Running, Success, Failed
-from prefect.utilities.context import Context
-
-from openlineage.prefect.facets import PrefectRunFacet
-from openlineage.prefect.util import package_version, task_qualified_name
+from openlineage.client.run import (
+    InputDataset,
+    Job,
+    OutputDataset,
+    Run,
+    RunEvent,
+    RunState,
+)
+from openlineage.prefect.util import package_version
 
 _DEFAULT_NAMESPACE = "default"
 NAMESPACE = os.getenv("OPENLINEAGE_NAMESPACE", _DEFAULT_NAMESPACE)
@@ -50,54 +47,17 @@ class OpenLineageAdapter:
         resp = self.client.session.get(self.client.url.replace("5000", "5001"))
         return resp.status_code == 200
 
-    def on_state_update(
-        self,
-        task: Task,
-        old_state: State,
-        new_state: State,
-        task_inputs: Optional[Dict] = None,
-        inputs_to_tasks: Optional[Dict] = None,
-    ):
-        if isinstance(task, Parameter):
-            # Don't do anything with parameters for now
-            return
-        context = prefect.context
-        kw = self.task_to_open_lineage_meta(task=task, context=context)
-        if task_inputs:
-            kw["inputs"] = OpenLineageAdapter.task_inputs_to_input_dataset(
-                task_inputs=task_inputs,
-                inputs_to_tasks=inputs_to_tasks,
-            )
-        if isinstance(new_state, Success):
-            kw["outputs"] = OpenLineageAdapter.task_result_to_output_dataset(
-                task=task, task_inputs=task_inputs, result=new_state._result
-            )
-
-        state_change = (type(old_state), type(new_state))
-
-        if state_change == (Pending, Running):
-            kw.update(
-                {
-                    "job_description": task_description(task=task),
-                    "parent_run_id": context.flow_run_id,
-                    "event_time": context.date.isoformat(),
-                }
-            )
-            return self.start_task(**kw)
-        elif state_change == (Running, Success):
-            return self.complete_task(**kw, end_time=context.date.isoformat())
-        elif state_change == (Running, Failed):
-            return self.fail_task(**kw, end_time=context.date.isoformat())
+    # @staticmethod
+    # def task_to_open_lineage_meta(task: Task) -> Dict:
+    #     return {
+    #         "run_id": context.task_run_id,
+    #         "job_name": f"{context.flow_name}.{context.task_name}",
+    #     }
 
     @staticmethod
-    def task_to_open_lineage_meta(task: Task, context: Context) -> Dict:
-        return {
-            "run_id": context.task_run_id,
-            "job_name": f"{context.flow_name}.{context.task_name}",
-        }
-
-    @staticmethod
-    def task_inputs_to_input_dataset(task_inputs: Dict, inputs_to_tasks: Dict) -> List[InputDataset]:
+    def task_inputs_to_input_dataset(
+        task_inputs: Dict, inputs_to_tasks: Dict
+    ) -> List[InputDataset]:
         return [
             InputDataset(
                 namespace=flow_namespace(),
@@ -108,21 +68,21 @@ class OpenLineageAdapter:
             for k, v in task_inputs.items()
         ]
 
-    @staticmethod
-    def task_result_to_output_dataset(task: Task, task_inputs: Dict, result: Result) -> OutputDataset:
-        output_facets = {}
-        task_full_name = task_qualified_name(task=task)
-        if not isinstance(task, Parameter):
-            output_facets["output-dataset"] = DataSourceDatasetFacet(
-                name=f"{task_full_name}-output",
-                uri=result_location(result, **task_inputs),
-            )
-        return OutputDataset(
-            namespace=flow_namespace(),
-            name=f"{task_full_name}",
-            facets={"prefect_run": PrefectRunFacet.from_task(task=task)},
-            outputFacets=output_facets,
-        )
+    # @staticmethod
+    # def task_result_to_output_dataset(task: Task, task_inputs: Dict, result: Result) -> OutputDataset:
+    #     output_facets = {}
+    #     task_full_name = task_qualified_name(task=task)
+    #     if not isinstance(task, Parameter):
+    #         output_facets["output-dataset"] = DataSourceDatasetFacet(
+    #             name=f"{task_full_name}-output",
+    #             uri=result_location(result, **task_inputs),
+    #         )
+    #     return OutputDataset(
+    #         namespace=flow_namespace(),
+    #         name=f"{task_full_name}",
+    #         facets={"prefect_run": PrefectRunFacet.from_task(task=task)},
+    #         outputFacets=output_facets,
+    #     )
 
     def start_task(
         self,
@@ -222,7 +182,9 @@ class OpenLineageAdapter:
     ) -> Run:
         facets = {}
         if parent_run_id:
-            facets.update({"parentRun": ParentRunFacet.create(parent_run_id, NAMESPACE, job_name)})
+            facets.update(
+                {"parentRun": ParentRunFacet.create(parent_run_id, NAMESPACE, job_name)}
+            )
 
         if custom_facets:
             facets.update(custom_facets)
@@ -241,7 +203,9 @@ class OpenLineageAdapter:
         if job_description:
             facets.update({"documentation": DocumentationJobFacet(job_description)})
         if code_location:
-            facets.update({"sourceCodeLocation": SourceCodeLocationJobFacet("", code_location)})
+            facets.update(
+                {"sourceCodeLocation": SourceCodeLocationJobFacet("", code_location)}
+            )
         if job_facets:
             facets = {**facets, **job_facets}
 
@@ -255,20 +219,20 @@ def flow_namespace() -> str:
     return f"{prefix}{prefect.context.flow_name}"
 
 
-def result_location(result: Result, **raw_inputs) -> str:
-    """Determine results location using the same formatting kwargs prefect does in `task_runner.get_task_run_state`"""
-    formatting_kwargs = {
-        **prefect.context.get("parameters", {}).copy(),
-        **prefect.context,
-        **raw_inputs,
-    }
-    clone = result.copy().format(**formatting_kwargs)
-    return clone.location
-
-
-def task_description(task) -> str:
-    if isinstance(task, Parameter):
-        # Parameters don't have any doc / description at this stage, simply return the name
-        return task.name
-    else:
-        return task.__doc__
+# def result_location(result: Result, **raw_inputs) -> str:
+#     """Determine results location using the same formatting kwargs prefect does in `task_runner.get_task_run_state`"""
+#     formatting_kwargs = {
+#         **prefect.context.get("parameters", {}).copy(),
+#         **prefect.context,
+#         **raw_inputs,
+#     }
+#     clone = result.copy().format(**formatting_kwargs)
+#     return clone.location
+#
+#
+# def task_description(task) -> str:
+#     if isinstance(task, Parameter):
+#         # Parameters don't have any doc / description at this stage, simply return the name
+#         return task.name
+#     else:
+#         return task.__doc__

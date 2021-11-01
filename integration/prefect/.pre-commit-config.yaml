@@ -1,0 +1,58 @@
+files: openlineage
+repos:
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.8.0
+    hooks:
+      - id: isort
+
+  - repo: https://github.com/psf/black
+    rev: 20.8b1
+    hooks:
+      - id: black
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.4.0
+    hooks:
+      - id: forbid-new-submodules
+      - id: fix-encoding-pragma
+        args: [--remove]
+      - id: end-of-file-fixer
+        types_or: [python, cython]
+      - id: trailing-whitespace
+        types_or: [python, cython]
+      - id: debug-statements
+      - id: detect-private-key
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+
+  - repo: https://github.com/hadialqattan/pycln
+    rev: v1.0.3
+    hooks:
+      - id: pycln
+        name: pycln (Python unused imports)
+        exclude: "nautilus_trader/live/node.py|nautilus_trader/adapters/betfair/execution.py"
+
+  - repo: https://gitlab.com/PyCQA/flake8
+    rev: 3.9.0
+    hooks:
+      - id: flake8
+        name: flake8 (python)
+        additional_dependencies:
+          - flake8-bandit
+          - flake8-black
+          - flake8-bugbear
+          - flake8-debugger
+          - flake8-deprecated
+          - flake8-pep3101
+          - flake8-string-format
+          - flake8-typing-imports
+        types: [python]
+        args:
+          - "--max-line-length=120"

@@ -1,61 +1,33 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pendulum
-import prefect
 from openlineage.client import OpenLineageClient
-from openlineage.client.facet import ParentRunFacet, DocumentationJobFacet, DataSourceDatasetFacet
-from openlineage.client.run import RunEvent, RunState, Run, Job, OutputDataset
-from prefect import Flow, Task
-from prefect.engine import FlowRunner
-from prefect.engine.state import Success, State, Pending, Running
-from prefect.tasks.shell import ShellTask
-
+from openlineage.client.facet import (
+    DataSourceDatasetFacet,
+    DocumentationJobFacet,
+    ParentRunFacet,
+)
+from openlineage.client.run import Job, OutputDataset, Run, RunEvent, RunState
 from openlineage.prefect.adapter import OpenLineageAdapter
 from openlineage.prefect.facets import PrefectRunFacet
-from openlineage.prefect.test_utils import RESOURCES
-from openlineage.prefect.test_utils.tasks import test_flow
-
-
-class SuccessTask(Task):
-    """A simple task"""
-
-    def run(self):
-        return 1
-
-
-class ErrorTask(Task):
-    def run(self):
-        raise ValueError("custom-error-message")
+from openlineage.prefect.test_utils.tasks import simple_flow
 
 
 class TestAdapter:
     def setup(self):
         self.adapter = OpenLineageAdapter()
-        self.task = SuccessTask()
-        prefect.context.update(
-            **dict(
-                flow_name="test-flow",
-                task_name="test-task",
-                task_run_id="5c6bf446-627b-425d-8cd7-8db027998f42",
-                flow_run_id="40991413-2cbe-4fd1-92b0-1e9790bbe104",
-                date=pendulum.DateTime(2021, 1, 1),
-            )
-        )
-
-    def _run_task(self, task_cls: type) -> State:
-        flow = Flow(name="flow-" + str(task_cls))
-        flow.add_task(task_cls())
-        flow_runner = FlowRunner(flow=flow)
-        state = flow_runner.run()
-        return state
+        # prefect.context.update(
+        #     **dict(
+        #         flow_name="test-flow",
+        #         task_name="test-task",
+        #         task_run_id="5c6bf446-627b-425d-8cd7-8db027998f42",
+        #         flow_run_id="40991413-2cbe-4fd1-92b0-1e9790bbe104",
+        #         date=pendulum.DateTime(2021, 1, 1),
+        #     )
+        # )
 
     @patch.object(OpenLineageClient, "emit")
     def test_task_started_to_run_event(self, mock_emit):
-        self.adapter.on_state_update(
-            old_state=Pending(),
-            new_state=Running(),
-            task=self.task,
-        )
+        simple_flow(p=1)
         run_event = mock_emit.call_args.args[0]
         expected = RunEvent(
             eventType=RunState.START,
@@ -84,11 +56,16 @@ class TestAdapter:
         )
         assert run_event == expected
 
-    @patch("openlineage.prefect.adapter.result_location", return_value="2021/1/1/fc357b2e.prefect_result")
+    @patch(
+        "openlineage.prefect.adapter.result_location",
+        return_value="2021/1/1/fc357b2e.prefect_result",
+    )
     @patch.object(OpenLineageClient, "emit")
     def test_task_success_to_run_event(self, mock_emit, _):
         success = self._run_task(task_cls=SuccessTask)
-        self.adapter.on_state_update(old_state=Running(), new_state=success, task=self.task, task_inputs={})
+        self.adapter.on_state_update(
+            old_state=Running(), new_state=success, task=self.task, task_inputs={}
+        )
         run_event = mock_emit.call_args.args[0]
         expected = RunEvent(
             eventType=RunState.COMPLETE,
