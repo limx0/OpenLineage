@@ -1,6 +1,5 @@
 from typing import Any, Awaitable, Callable, Dict, Optional  # noqa: TYP001
 
-
 from openlineage.prefect.adapter import OpenLineageAdapter
 from prefect.executors import BaseExecutor
 from prefect.futures import PrefectFuture
@@ -16,7 +15,7 @@ class OpenLineageExecutor(BaseExecutor):
         # Ensure we can connect early - don't want this to trigger tasks to fail inside the flow
         self._adapter.ping()
 
-    def submit(
+    async def submit(
         self,
         task_run: TaskRun,
         run_fn: Callable[..., Awaitable[State[R]]],
@@ -31,7 +30,7 @@ class OpenLineageExecutor(BaseExecutor):
         )
         return future
 
-    def wait(
+    async def wait(
         self, prefect_future: PrefectFuture, timeout: float = None
     ) -> Optional[State]:
         state = super().wait(prefect_future=prefect_future)
