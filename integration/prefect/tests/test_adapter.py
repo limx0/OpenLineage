@@ -17,6 +17,8 @@ from openlineage.prefect.test_utils.tasks import simple_flow, get, inc
 
 class TestAdapter:
     def setup(self):
+        os.environ['PREFECT_ORION_DATABASE_CONNECTION_URL'] = "sqlite+memory:///"
+        os.environ['OPENLINEAGE_URL'] = "http://192.168.1.39:5000"
         self.adapter = OpenLineageAdapter()
         # prefect.context.update(
         #     **dict(
@@ -133,7 +135,7 @@ class TestAdapter:
         @flow()
         def bar():
             r1 = get(1)
-            r2 = inc(x=r1)
+            r2 = inc(r1)
             r2 = r2.wait()
             return r1, r2
 
@@ -142,6 +144,3 @@ class TestAdapter:
         assert first_state.name == "Completed"
         assert second_state.name == "Cached"
         assert second_state.result() == first_state.result()
-
-
-

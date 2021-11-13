@@ -6,8 +6,8 @@ authors = []
 
 [tool.poetry.dependencies]
 python = "^3.7"
-prefect = {version = "^2.0a3", allow-prereleases = true}
-openlineage-python = "^0.2.2"
+prefect = {version = "^2.0a4", allow-prereleases = true}
+openlineage-python = "^0.3.1"
 tomlkit = "^0.7.2"
 
 [tool.poetry.dev-dependencies]

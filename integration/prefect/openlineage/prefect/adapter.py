@@ -12,6 +12,7 @@ from openlineage.client.run import (
     RunEvent,
     RunState,
 )
+from prefect import State
 from prefect._version import get_versions
 from prefect.futures import PrefectFuture
 from prefect.orion.models.orm import TaskRun
@@ -30,6 +31,7 @@ class OpenLineageAdapter:
     """
 
     _client = None
+    _job_names = {}
 
     @property
     def client(self) -> OpenLineageClient:
@@ -49,6 +51,7 @@ class OpenLineageAdapter:
         self,
         task: Task,
         task_run: TaskRun,
+        run_kwargs: Dict,
         inputs: Optional[List[InputDataset]] = None,
         outputs: Optional[OutputDataset] = None,
         job_facets: Optional[List[BaseFacet]] = None,
@@ -71,61 +74,25 @@ class OpenLineageAdapter:
         job_description = task.fn.__doc__
         event_time = task_run.created.isoformat()
         parent_run_id = str(task_run.flow_run_id)
+        self._job_names[run_id] = job_name
         event = RunEvent(
             eventType=RunState.START,
             eventTime=event_time,
             run=self._build_run(run_id, parent_run_id, job_name, run_facets),
             job=self._build_job(job_name, job_description, code_location, job_facets),
-            inputs=inputs,
+            inputs=self._kwargs_to_inputs(kw=run_kwargs),
             outputs=outputs,
             producer=PRODUCER,
         )
         self.client.emit(event)
         return event.run.runId
 
-    # def start_task(
-    #     self,
-    #     run_id: str,
-    #     job_name: str,
-    #     job_description: str,
-    #     event_time: str,
-    #     parent_run_id: Optional[str],
-    #     inputs: Optional[List[InputDataset]] = None,
-    #     outputs: Optional[OutputDataset] = None,
-    #     job_facets: Optional[List[BaseFacet]] = None,
-    #     code_location: Optional[str] = None,
-    #     run_facets: Optional[Dict[str, Type[BaseFacet]]] = None,  # Custom run facets
-    # ) -> str:
-    #     """
-    #     Emits openlineage event of type START
-    #     :param run_id: globally unique identifier of task in dag run
-    #     :param job_name: globally unique identifier of task in dag
-    #     :param job_description: user provided description of job
-    #     :param event_time:
-    #     :param parent_run_id: identifier of job spawning this task
-    #     :param code_location: file path or URL of DAG file
-    #     :param run_facets:
-    #     :return:
-    #     """
-    #
-    #     event = RunEvent(
-    #         eventType=RunState.START,
-    #         eventTime=event_time,
-    #         run=self._build_run(run_id, parent_run_id, job_name, run_facets),
-    #         job=self._build_job(job_name, job_description, code_location, job_facets),
-    #         inputs=inputs,
-    #         outputs=outputs,
-    #         producer=PRODUCER,
-    #     )
-    #     self.client.emit(event)
-    #     return event.run.runId
-
     def complete_task(
         self,
-        future: PrefectFuture,
+        result: State,
         inputs: Optional[List[InputDataset]] = None,
         outputs: Optional[OutputDataset] = None,
-        job_facets: Optional[List[BaseFacet]] = None,
+        # job_facets: Optional[List[BaseFacet]] = None,
     ):
         """
         Emits openlineage event of type COMPLETE
@@ -133,12 +100,12 @@ class OpenLineageAdapter:
         :param job_name: globally unique identifier of task between dags
         :param end_time: time of task completion
         """
-
+        task_run_id = str(result.state_details.task_run_id)
         event = RunEvent(
             eventType=RunState.COMPLETE,
-            # eventTime=end_time,
-            # run=self._build_run(run_id),
-            # job=self._build_job(job_name, job_facets=job_facets),
+            eventTime=result.timestamp.isoformat(),
+            run=self._build_run(task_run_id),
+            job=self._build_job(self._job_names[task_run_id], job_facets=None),
             inputs=inputs,
             outputs=outputs,
             producer=PRODUCER,
@@ -147,9 +114,7 @@ class OpenLineageAdapter:
 
     def fail_task(
         self,
-        run_id: str,
-        job_name: str,
-        end_time: str,
+        result: State,
         inputs: Optional[List[InputDataset]] = None,
         outputs: Optional[OutputDataset] = None,
     ):
@@ -159,11 +124,12 @@ class OpenLineageAdapter:
         :param job_name: globally unique identifier of task between dags
         :param end_time: time of task completion
         """
+        task_run_id = str(result.state_details.task_run_id)
         event = RunEvent(
             eventType=RunState.FAIL,
-            eventTime=end_time,
-            run=self._build_run(run_id),
-            job=self._build_job(job_name),
+            eventTime=result.timestamp.isoformat(),
+            run=self._build_run(str(result.state_details.task_run_id)),
+            job=self._build_job(self._job_names[task_run_id]),
             inputs=inputs,
             outputs=outputs,
             producer=PRODUCER,
@@ -203,6 +169,9 @@ class OpenLineageAdapter:
         #     facets = {**facets, **job_facets}
 
         return Job(NAMESPACE, job_name, facets)
+
+    def _kwargs_to_inputs(self, kw: Dict):
+        return None
 
 
 def flow_namespace() -> str:
