@@ -1,45 +1,52 @@
-from typing import Any, Awaitable, Callable, Dict, Optional  # noqa: TYP001
+from typing import Any, Callable, Dict, Optional
 
 from openlineage.prefect.adapter import OpenLineageAdapter
 from prefect.executors import BaseExecutor
 from prefect.futures import PrefectFuture
 from prefect.orion.schemas.core import TaskRun
-from prefect.orion.schemas.states import State
-from prefect.utilities.asyncio import A, R
-
-from openlineage.prefect.util import utc_now
+from prefect.orion.schemas.states import State, StateType
 
 
-class OpenLineageExecutor(BaseExecutor):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._adapter = OpenLineageAdapter()
-        # Ensure we can connect early - don't want this to trigger tasks to fail inside the flow
-        # self._adapter.ping()
+def parse_task_inputs(inputs: Dict):
+    def _parse_task_input(x):
+        # TODO - need to look up TaskRunResult output DataDocument
+        return x
 
-    async def submit(
-        self,
+    return {k: _parse_task_input(v) for k, v in inputs.items()}
+
+
+def on_submit(method, adapter: OpenLineageAdapter):
+    async def inner(
+        self: BaseExecutor,
         task_run: TaskRun,
-        run_fn: Callable[..., Awaitable[State[R]]],
+        run_fn: Callable[..., State],
         run_kwargs: Dict[str, Any],
-        asynchronous: A = True,
-    ) -> PrefectFuture[R, A]:
-        future = super().submit(
-            task_run=task_run,
-            run_fn=run_fn,
-            run_kwargs=run_kwargs,
-            asynchronous=asynchronous,
-        )
-        self._adapter.start_task(
-            run_id=str(task_run.id),
-            job_name=run_kwargs['task'].name,
-            job_description=run_kwargs['task'].description,
-            event_time=utc_now(),
+    ) -> PrefectFuture:
+        adapter.start_task(task=run_kwargs["task"], task_run=task_run)
+        future = await method(
+            self=self, task_run=task_run, run_fn=run_fn, run_kwargs=run_kwargs
         )
         return future
 
-    async def wait(
-        self, prefect_future: PrefectFuture, timeout: float = None
-    ) -> Optional[State]:
-        state = super().wait(prefect_future=prefect_future)
-        return state
+    return inner
+
+
+def on_wait(method, adapter: OpenLineageAdapter):
+    async def inner(
+        self: BaseExecutor, prefect_future: PrefectFuture, timeout: float = None
+    ):
+        result = await method(self=self, prefect_future=prefect_future, timeout=timeout)
+        if result.type == StateType.COMPLETED:
+            adapter.complete_task(result=result)
+        elif result.TYPE == StateType.FAILED:
+            adapter.fail_task()
+        return result
+
+    return inner
+
+
+def track_lineage(cls: BaseExecutor, open_lineage_url: Optional[str] = None):
+    adapter = OpenLineageAdapter()
+    cls.submit = on_submit(cls.submit, adapter=adapter)
+    cls.wait = on_wait(cls.wait, adapter=adapter)
+    return cls

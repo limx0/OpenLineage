@@ -10,5 +10,5 @@ import pytest
 def mock_open_lineage_client(client, client2):
     # client.session = MagicMock()
     # client2.session = MagicMock()
-    os.environ['PREFECT_ORION_DATABASE_CONNECTION_URL'] = "sqlite+memory:////"
+    os.environ['PREFECT_ORION_DATABASE_CONNECTION_URL'] = "sqlite+aiosqlite:///file::memory:?cache=shared&uri=true&check_same_thread=false"
     return client

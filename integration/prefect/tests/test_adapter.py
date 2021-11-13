@@ -8,9 +8,11 @@ from openlineage.client.facet import (
     ParentRunFacet,
 )
 from openlineage.client.run import Job, OutputDataset, Run, RunEvent, RunState
+from prefect import flow
+
 from openlineage.prefect.adapter import OpenLineageAdapter
 from openlineage.prefect.facets import PrefectRunFacet
-from openlineage.prefect.test_utils.tasks import simple_flow
+from openlineage.prefect.test_utils.tasks import simple_flow, get, inc
 
 
 class TestAdapter:
@@ -25,6 +27,9 @@ class TestAdapter:
         #         date=pendulum.DateTime(2021, 1, 1),
         #     )
         # )
+
+    def test_task_result(self):
+        result = simple_flow(p=1)
 
     @patch.object(OpenLineageClient, "emit")
     def test_task_started_to_run_event(self, mock_emit):
@@ -123,3 +128,20 @@ class TestAdapter:
             outputs=None,
         )
         assert run_event == expected
+
+    def test_cache_hits_within_flows_are_cached(self):
+        @flow()
+        def bar():
+            r1 = get(1)
+            r2 = inc(x=r1)
+            r2 = r2.wait()
+            return r1, r2
+
+        flow_state = bar()
+        first_state, second_state = flow_state.result()
+        assert first_state.name == "Completed"
+        assert second_state.name == "Cached"
+        assert second_state.result() == first_state.result()
+
+
+

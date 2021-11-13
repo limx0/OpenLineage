@@ -1,8 +1,10 @@
 import json
 
-from openlineage.prefect.executor import OpenLineageExecutor
+from openlineage.prefect.executor import track_lineage
 from openlineage.prefect.test_utils import RESOURCES
-from prefect import flow, task
+from prefect import executors, flow, task
+
+executors.SequentialExecutor = track_lineage(executors.SequentialExecutor)
 
 
 @task()
@@ -15,8 +17,8 @@ def get(n):
 
 
 @task()
-def inc(g):
-    return g + 1
+def inc(g, y=1):
+    return g + y
 
 
 @task()
@@ -37,7 +39,7 @@ def error_task():
     raise ValueError("custom-error-message")
 
 
-@flow(executor=OpenLineageExecutor())
+@flow()
 def simple_flow(p: str):
     g = get(p)
     i = inc(g)
@@ -45,6 +47,6 @@ def simple_flow(p: str):
     non_data_task(m)
 
 
-@flow(executor=OpenLineageExecutor())
+@flow()
 def error_flow():
     return error_task()
