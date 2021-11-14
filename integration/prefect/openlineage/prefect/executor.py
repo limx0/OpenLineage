@@ -25,10 +25,10 @@ def on_submit(method, adapter: OpenLineageAdapter):
         run_kwargs: Dict[str, Any],
         asynchronous: A = True,
     ) -> PrefectFuture:
-        adapter.start_task(task=run_kwargs["task"], task_run=task_run, run_kwargs=run_kwargs)
         future = await method(
             self=self, task_run=task_run, run_fn=run_fn, run_kwargs=run_kwargs, asynchronous=asynchronous,
         )
+        adapter.start_task(task=run_kwargs["task"], task_run=task_run, run_kwargs=run_kwargs)
         return future
 
     return inner
@@ -38,12 +38,12 @@ def on_wait(method, adapter: OpenLineageAdapter):
     async def inner(
         self: BaseExecutor, prefect_future: PrefectFuture, timeout: float = None
     ):
-        result = await method(self=self, prefect_future=prefect_future, timeout=timeout)
-        if result.type == StateType.COMPLETED:
-            adapter.complete_task(result=result)
-        elif result.TYPE == StateType.FAILED:
-            adapter.fail_task(result=result)
-        return result
+        state = await method(self=self, prefect_future=prefect_future, timeout=timeout)
+        if state.type == StateType.COMPLETED:
+            adapter.complete_task(state=state, future=prefect_future)
+        elif state.TYPE == StateType.FAILED:
+            adapter.fail_task(state=state, future=prefect_future)
+        return state
 
     return inner
 
